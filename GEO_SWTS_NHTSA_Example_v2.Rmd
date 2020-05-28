@@ -1,0 +1,150 @@
+---
+title: "GEO_Code - National Highway Traffic Safety Administration (NHTSA)"
+author: "J. Dayton"
+date: "5/13/2020"
+output: pdf_document
+always_allow_html: true
+---
+## National Highway Traffic Safety Administration (NHTSA) - Fatality Analysis Reporting System (FARS)
+
+## STEP 0: Load Libraries
+
+```{r setup, include=FALSE, warning=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(dplyr)
+library(htmltools)
+library(knitr)
+library(leaflet)
+library(lubridate)
+
+# source("custFunc.R")
+```
+
+## Get the Vehicle Crash Data
+
+Source of data: <https://www.nhtsa.gov/node/97996/176776>.
+
+National Highway Traffic Safety Administration (NHTSA) - Fatality Analysis Reporting System (FARS)
+
+### FARS Auxiliary Files
+
+The FARS Auxiliary files are datasets that are derived from the standard FARS datasets:
+
+* 1. Accident -> Acc_Aux 
+* 2. Vehicle -> Veh_Aux
+* 3. Person -> Per_Aux
+
+These files are joined by the standard key variables.
+Please read the following document for additional details: <http://www-nrd.nhtsa.dot.gov/Pubs/811364.pdf>
+For User Manuals, please go to: <ftp://ftp.nhtsa.dot.gov/FARS/FARS-Doc/FARS_Auxiliary_Analytical_User_Manuals.zip>
+For SAS Format Catalog, please go to: <ftp://ftp.nhtsa.dot.gov/FARS/Auxiliary_FARS_Files_Formats>
+
+## STEP 1: Import relevant data set.
+
+```{r getData}
+##Load the data
+dfAcc <- read.csv("./FARS2018NationalCSV/ACCIDENT.csv", 
+                     stringsAsFactors = FALSE)
+
+```
+
+### Clean Data
+
+Check for NA values. Due to length of output, code commented out to not show in this document.
+
+```{r }
+# head(dfAcc)
+# summary(dfAcc)
+dim(dfAcc)
+```
+
+## STEP 2. Aggregate data.
+
+Focus data on area of interest:
+
+* STATE = 10 for Delaware
+* STATE = 11 for Washington, DC
+* STATE = 24 for Maryland
+* STATE = 51 for Virginia
+
+``` {r stateReduc}
+df <- dfAcc[dfAcc$STATE %in% c(10, 11, 24, 51), ] #For DE, DC, MD, VA
+# rm(dfAcc) #Removing original df - no longer referenced
+dim(df)
+```
+
+Fix the date by combining multiple elements from original data.
+
+```{r fixDate}
+df$Date <- mdy_hms(paste0(df$MONTH, "/", df$DAY, "/", df$YEAR, " ", df$HOUR, ":", df$MINUTE, ":00"))
+```
+
+Reduce the data frame to focus on the items of interest.  Also, renaming the variables to simplify.
+
+```{r simpDF}
+df <- df %>%
+   select(Date = Date, Lat = LATITUDE, Lon = LONGITUD, State = STATE, 
+          Pedestrians = PERNOTMVIT, Motorists = PERMVIT, Fatalities = FATALS,
+          Vehicles = VE_TOTAL)
+dim(df)
+kable(head(df), "pandoc", row.names = FALSE)
+```
+
+## STEP 3. Merge data from data set to map data.
+
+Not required for leaflet plot when data contains lat & lon.
+
+## STEP 4. Create the plot(s).
+
+### Leaflet with Markers
+
+```{r mapMarker}
+labs <- lapply(seq(nrow(df)), function(i) {
+   paste0( '<p><b>DATE: </b>', format(df[i, "Date"], format="%d %b %y"), 
+           '</p><p><b>TIME: </b>', format(df[i, "Date"], format = "%H:%M"), 
+           '</p><p><b>FATALITIES: </b>',df[i, "Fatalities"], 
+          '</p><p><b>VEHICLES: </b>',df[i, "Vehicles"],
+          '</p><p><b>MOTORISTS: </b>',df[i, "Motorists"],
+          '</p><p><b>PEDESTRIANS: </b>',df[i, "Pedestrians"], '</p>' ) 
+   } )
+
+leafMap <- df %>% 
+   leaflet() %>% 
+   addTiles() %>% 
+   setView(lng = mean(df$Lon, na.rm = TRUE), lat = mean(df$Lat, na.rm = TRUE),  zoom = 7) %>%
+   addMarkers(lng = ~Lon, lat = ~Lat,  
+              label = lapply(labs, htmltools::HTML) )
+leafMap
+```
+## 2018 Motor Vehicle Fatalities in the DMV (above)
+
+### Leaflet with Cluster Markers
+
+```{r mapCluster}
+leafClustMap <- df %>% 
+   leaflet() %>% 
+   addTiles() %>% 
+   setView(lng = mean(df$Lon, na.rm = TRUE), lat = mean(df$Lat, na.rm = TRUE),  zoom = 7) %>%
+   addMarkers(lng = ~Lon, lat = ~Lat,  
+              label = lapply(labs, htmltools::HTML),
+              clusterOptions = markerClusterOptions() )
+leafClustMap
+```
+
+## 2018 Motor Vehicle Fatalities in the DMV (above)
+
+### Leaflet with Circle Markers
+
+```{r leafCircle}
+leafCircleMap <- df %>% 
+   leaflet() %>% 
+   addTiles() %>% 
+   setView(lng = mean(df$Lon, na.rm = TRUE), lat = mean(df$Lat, na.rm = TRUE),  zoom = 7) %>%
+   addCircleMarkers(lng = ~Lon, lat = ~Lat,  
+              color = "red", opacity = 0.4, radius = 0.5,
+              label = lapply(labs, htmltools::HTML) )
+leafCircleMap
+```
+
+## 2018 Motor Vehicle Fatalities in the DMV (above)
