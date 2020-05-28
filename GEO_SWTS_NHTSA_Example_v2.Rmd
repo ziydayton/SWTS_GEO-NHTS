@@ -2,26 +2,26 @@
 title: "GEO_Code - National Highway Traffic Safety Administration (NHTSA)"
 author: "J. Dayton"
 date: "5/13/2020"
-output: pdf_document
+output: html_document
 always_allow_html: true
 ---
+
+# 2018 Vehicle Crash Data for the DMV
+
 ## National Highway Traffic Safety Administration (NHTSA) - Fatality Analysis Reporting System (FARS)
 
-## STEP 0: Load Libraries
-
 ```{r setup, include=FALSE, warning=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = FALSE)
 
 library(dplyr)
 library(htmltools)
+library(kableExtra)
 library(knitr)
 library(leaflet)
 library(lubridate)
-
-# source("custFunc.R")
 ```
 
-## Get the Vehicle Crash Data
+## 2018 Vehicle Crash Data for the United States
 
 Source of data: <https://www.nhtsa.gov/node/97996/176776>.
 
@@ -29,113 +29,110 @@ National Highway Traffic Safety Administration (NHTSA) - Fatality Analysis Repor
 
 ### FARS Auxiliary Files
 
-The FARS Auxiliary files are datasets that are derived from the standard FARS datasets:
+The FARS Auxiliary files are data sets that are derived from the standard FARS data sets:
 
 * 1. Accident -> Acc_Aux 
 * 2. Vehicle -> Veh_Aux
 * 3. Person -> Per_Aux
 
-These files are joined by the standard key variables.
-Please read the following document for additional details: <http://www-nrd.nhtsa.dot.gov/Pubs/811364.pdf>
-For User Manuals, please go to: <ftp://ftp.nhtsa.dot.gov/FARS/FARS-Doc/FARS_Auxiliary_Analytical_User_Manuals.zip>
-For SAS Format Catalog, please go to: <ftp://ftp.nhtsa.dot.gov/FARS/Auxiliary_FARS_Files_Formats>
-
-## STEP 1: Import relevant data set.
+These files are joined by the standard key variables.  Please read the following document for additional details: <http://www-nrd.nhtsa.dot.gov/Pubs/811364.pdf>.  For User Manuals, please go to: <ftp://ftp.nhtsa.dot.gov/FARS/FARS-Doc/FARS_Auxiliary_Analytical_User_Manuals.zip>.  For SAS Format Catalog, please go to: <ftp://ftp.nhtsa.dot.gov/FARS/Auxiliary_FARS_Files_Formats>
 
 ```{r getData}
+## STEP 1: Import relevant data set.
 ##Load the data
 dfAcc <- read.csv("./FARS2018NationalCSV/ACCIDENT.csv", 
                      stringsAsFactors = FALSE)
 
 ```
-
+```{r cleanDataCheck, include=FALSE}
 ### Clean Data
-
-Check for NA values. Due to length of output, code commented out to not show in this document.
-
-```{r }
+#Check for NA values. Due to length of output, code commented out to not show in this document.
 # head(dfAcc)
 # summary(dfAcc)
 dim(dfAcc)
 ```
 
-## STEP 2. Aggregate data.
 
-Focus data on area of interest:
+#### The 2018 Vehicle Crash Data was aggregated to only include accident in the DMV region (Delaware, Maryland, and Virginia to include Washington, DC)
+
+Data focused (sorted) on areas of interest:
 
 * STATE = 10 for Delaware
 * STATE = 11 for Washington, DC
 * STATE = 24 for Maryland
 * STATE = 51 for Virginia
 
-``` {r stateReduc}
+``` {r stateReduc, include=FALSE}
+## STEP 2. Aggregate data.
 df <- dfAcc[dfAcc$STATE %in% c(10, 11, 24, 51), ] #For DE, DC, MD, VA
 # rm(dfAcc) #Removing original df - no longer referenced
 dim(df)
 ```
-
-Fix the date by combining multiple elements from original data.
-
 ```{r fixDate}
+#Fix the date by combining multiple elements from original data.
 df$Date <- mdy_hms(paste0(df$MONTH, "/", df$DAY, "/", df$YEAR, " ", df$HOUR, ":", df$MINUTE, ":00"))
 ```
-
-Reduce the data frame to focus on the items of interest.  Also, renaming the variables to simplify.
-
-```{r simpDF}
+```{r simpDF, include=FALSE}
+#Reduce the data frame to focus on the items of interest.  Also, renaming the variables to simplify.
 df <- df %>%
    select(Date = Date, Lat = LATITUDE, Lon = LONGITUD, State = STATE, 
           Pedestrians = PERNOTMVIT, Motorists = PERMVIT, Fatalities = FATALS,
           Vehicles = VE_TOTAL)
 dim(df)
-kable(head(df), "pandoc", row.names = FALSE)
 ```
 
-## STEP 3. Merge data from data set to map data.
-
-Not required for leaflet plot when data contains lat & lon.
-
-## STEP 4. Create the plot(s).
-
-### Leaflet with Markers
+## Head of Data Table (After aggregation and sort):
+```{r dataTableOut}
+dTable <- kable(head(df), row.names = FALSE) %>%
+   kable_styling(latex_options = c("striped", "scale_down"))
+dTable
+```
+## Marker Map
 
 ```{r mapMarker}
+## STEP 3. Merge data from data set to map data.
+#Not required for leaflet plot when data contains lat & lon.
+## STEP 4. Create the plot(s).
+#Leaflet with Markers
 labs <- lapply(seq(nrow(df)), function(i) {
-   paste0( '<p><b>DATE: </b>', format(df[i, "Date"], format="%d %b %y"), 
-           '</p><p><b>TIME: </b>', format(df[i, "Date"], format = "%H:%M"), 
-           '</p><p><b>FATALITIES: </b>',df[i, "Fatalities"], 
-          '</p><p><b>VEHICLES: </b>',df[i, "Vehicles"],
-          '</p><p><b>MOTORISTS: </b>',df[i, "Motorists"],
-          '</p><p><b>PEDESTRIANS: </b>',df[i, "Pedestrians"], '</p>' ) 
+   paste0( '<b>DATE: </b>', format(df[i, "Date"], format="%d %b %y"), "</br>", 
+           '<b>TIME: </b>', format(df[i, "Date"], format = "%H:%M"), "</br>",
+           '<b>FATALITIES: </b>',df[i, "Fatalities"], "</br>",
+          '<b>VEHICLES: </b>',df[i, "Vehicles"], "</br>",
+          '<b>MOTORISTS: </b>',df[i, "Motorists"], "</br>",
+          '<b>PEDESTRIANS: </b>',df[i, "Pedestrians"]) 
    } )
 
 leafMap <- df %>% 
    leaflet() %>% 
    addTiles() %>% 
-   setView(lng = mean(df$Lon, na.rm = TRUE), lat = mean(df$Lat, na.rm = TRUE),  zoom = 7) %>%
+   setView(lng = mean(df$Lon, na.rm = TRUE), lat = mean(df$Lat, na.rm = TRUE),  zoom = 6) %>%
    addMarkers(lng = ~Lon, lat = ~Lat,  
-              label = lapply(labs, htmltools::HTML) )
+              label = lapply(labs, htmltools::HTML) ) %>%
+   addControl("<b>2018 Fatal Vehicle Crashes in the DMV</b>", 
+             position = "topright")
 leafMap
 ```
-## 2018 Motor Vehicle Fatalities in the DMV (above)
 
-### Leaflet with Cluster Markers
+The above map is interesting, but too busy.  The next two maps will use the same data presented slightly different.
 
+## Cluster Map
 ```{r mapCluster}
 leafClustMap <- df %>% 
    leaflet() %>% 
    addTiles() %>% 
-   setView(lng = mean(df$Lon, na.rm = TRUE), lat = mean(df$Lat, na.rm = TRUE),  zoom = 7) %>%
+   setView(lng = mean(df$Lon, na.rm = TRUE), lat = mean(df$Lat, na.rm = TRUE),  zoom = 6) %>%
    addMarkers(lng = ~Lon, lat = ~Lat,  
               label = lapply(labs, htmltools::HTML),
-              clusterOptions = markerClusterOptions() )
+              clusterOptions = markerClusterOptions() )%>%
+   addControl("<b>2018 Fatal Vehicle Crashes in the DMV</b>", 
+             position = "topright")
 leafClustMap
 ```
 
-## 2018 Motor Vehicle Fatalities in the DMV (above)
+Zoom in/out and the map will auto-cluster.
 
-### Leaflet with Circle Markers
-
+### Circle Marker Map
 ```{r leafCircle}
 leafCircleMap <- df %>% 
    leaflet() %>% 
@@ -143,8 +140,10 @@ leafCircleMap <- df %>%
    setView(lng = mean(df$Lon, na.rm = TRUE), lat = mean(df$Lat, na.rm = TRUE),  zoom = 7) %>%
    addCircleMarkers(lng = ~Lon, lat = ~Lat,  
               color = "red", opacity = 0.4, radius = 0.5,
-              label = lapply(labs, htmltools::HTML) )
+              label = lapply(labs, htmltools::HTML) )%>%
+   addControl("<b>2018 Fatal Vehicle Crashes in the DMV</b>", 
+             position = "topright")
 leafCircleMap
 ```
 
-## 2018 Motor Vehicle Fatalities in the DMV (above)
+This map resembles a heat-map while retaining the interactive qualities, popup markers and zoom, of the previous maps.

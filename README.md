@@ -1,6 +1,6 @@
 ## National Highway Traffic Safety Administration (NHTSA) - Fatality Analysis Reporting System (FARS)
 
-## Vehicle Crash Data
+## 2018 Vehicle Crash Data
 
 Source of data: <https://www.nhtsa.gov/node/97996/176776>.
 
@@ -8,7 +8,7 @@ National Highway Traffic Safety Administration (NHTSA) - Fatality Analysis Repor
 
 ### FARS Auxiliary Files
 
-The FARS Auxiliary files are datasets that are derived from the standard FARS datasets:
+The FARS Auxiliary files are data sets that are derived from the standard FARS data sets:
 
 * 1. Accident -> Acc_Aux 
 * 2. Vehicle -> Veh_Aux
